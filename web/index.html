@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ЭкоГИС ЗКО</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@600;700&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <svg class="crest" viewBox="0 0 46 52" aria-hidden="true">
+      <path d="M3 3h40v22c0 13-9 21-20 24C12 46 3 38 3 25z" fill="#5a1d18" stroke="#e2c47a" stroke-width="2"/>
+      <path d="M23 12c-6 6-9 11-9 16a9 9 0 0 0 18 0c0-5-3-10-9-16z" fill="#5d9b45" stroke="#e2c47a" stroke-width="1.2"/>
+      <path d="M23 18v22M23 28l-5-4M23 32l5-4" stroke="#e2c47a" stroke-width="1.4" fill="none"/>
+    </svg>
+    <div class="brand">
+      <h1 data-i18n="title"></h1>
+      <p><span data-i18n="subtitle"></span> · <span class="src-chip" id="srcChip"></span></p>
+    </div>
+    <div class="chips" id="chips"></div>
+    <button class="btn lang-btn" id="langBtn" type="button"></button>
+    <button class="btn" id="addBtn" type="button" data-i18n="add"></button>
+    <button class="btn" id="ledgerBtn" type="button" data-i18n="ledger"></button>
+    <button class="btn" id="dataBtn" type="button" data-i18n="sources"></button>
+    <div class="datebox">
+      <button class="playbtn" id="playBtn" type="button"></button>
+      <div class="date" id="dateLbl"></div>
+      <div class="speeds" id="speeds"></div>
+    </div>
+    <div class="timeline">
+      <label for="timeline" data-i18n="timeline"></label>
+      <span id="tStart"></span>
+      <input type="range" id="timeline" min="0" step="1">
+      <span id="tEnd"></span>
+      <span class="paused-tag" id="pausedTag" data-i18n="paused"></span>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <svg id="map" viewBox="0 0 800 570" preserveAspectRatio="xMidYMid meet" role="img">
+      <defs>
+        <filter id="paper" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/>
+          <feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .22 0"/>
+        </filter>
+        <radialGradient id="vign" cx="50%" cy="50%" r="75%">
+          <stop offset="60%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000" stop-opacity=".55"/>
+        </radialGradient>
+      </defs>
+      <rect x="-400" y="-300" width="1600" height="1200" fill="#5b5e57"/>
+      <g id="neighbours" pointer-events="none"></g>
+      <g id="provs"></g>
+      <g id="river" pointer-events="none"></g>
+      <g id="labels" pointer-events="none"></g>
+      <g id="stations"></g>
+      <g id="poi" pointer-events="none"></g>
+      <rect x="-400" y="-300" width="1600" height="1200" filter="url(#paper)" pointer-events="none"/>
+      <rect x="-400" y="-300" width="1600" height="1200" fill="url(#vign)" pointer-events="none"/>
+    </svg>
+    <div class="tip" id="tip"></div>
+    <div class="loading" id="loading">Загрузка карты… / Карта жүктелуде…</div>
+
+    <section class="panel prov-panel" id="provPanel" aria-live="polite"></section>
+
+    <section class="panel alerts" id="alertsPanel">
+      <h3 data-i18n="alertsTitle"></h3>
+      <ul id="alertList"></ul>
+    </section>
+
+    <section class="panel modes" id="modesPanel">
+      <div class="legend" id="legend"></div>
+      <div class="mode-grid" id="modeGrid"></div>
+    </section>
+
+    <div class="note" id="note"></div>
+  </main>
+</div>
+
+<div class="overlay" id="eventOv" role="dialog" aria-modal="true" aria-labelledby="evTitle">
+  <div class="event">
+    <div class="event-head" id="evTitle"></div>
+    <svg class="event-art" id="evArt" viewBox="0 0 460 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true"></svg>
+    <div class="event-body">
+      <p class="from" id="evFrom"></p>
+      <p id="evText" style="margin:0"></p>
+    </div>
+    <div class="event-opts">
+      <button type="button" id="evInspect" data-i18n="evInspect"></button>
+      <button type="button" id="evNote" data-i18n="evNote"></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ledgerOv" role="dialog" aria-modal="true" aria-labelledby="ledTitle">
+  <div class="panel ledger">
+    <header><h2 id="ledTitle" data-i18n="ledger"></h2><button class="btn" id="ledgerClose" type="button" data-i18n="close"></button></header>
+    <div class="scroll"><table><thead><tr id="ledHead"></tr></thead><tbody id="ledBody"></tbody></table></div>
+    <footer data-i18n="ledgerHint"></footer>
+  </div>
+</div>
+
+<div class="overlay" id="addOv" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+  <div class="panel form-panel">
+    <header><h2 id="addTitle" data-i18n="add"></h2><button class="btn" id="addClose" type="button" data-i18n="close"></button></header>
+    <div class="form-body" id="addBody"></div>
+  </div>
+</div>
+
+<div class="overlay" id="dataOv" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
+  <div class="panel about">
+    <header><h2 id="dataTitle" data-i18n="sources"></h2><button class="btn" id="dataClose" type="button" data-i18n="close"></button></header>
+    <div class="scroll" lang="ru" data-lang="ru">
+      <section>
+        <h3>Что на карте сейчас</h3>
+        <table>
+          <thead><tr><th>Слой</th><th>Откуда</th><th>Статус</th></tr></thead>
+          <tbody>
+            <tr><td>Границы 12 районов</td><td><a href="https://github.com/wmgeolab/geoBoundaries">geoBoundaries</a>, административное деление Казахстана ADM2 (CC BY 4.0)</td><td><span class="status real">Реальные, упрощены</span></td></tr>
+            <tr><td>Контур г. Уральска</td><td>Отдельной границы города в наборе нет, контур задан условно вокруг центра</td><td><span class="status approx">Условный</span></td></tr>
+            <tr><td>Река Урал, Карачаганак, районные центры</td><td>Координаты нанесены вручную</td><td><span class="status approx">Приблизительные</span></td></tr>
+            <tr><td>Станции мониторинга</td><td>Размещены в районных центрах для демонстрации</td><td><span class="status demo">Демонстрационные</span></td></tr>
+            <tr><td>AQI, ИЗВ, деградация почв, NDVI, осадки</td><td>Сгенерированы скриптом: случайные значения с сезонными закономерностями (зимний смог, весеннее половодье, летний максимум осадков, засушливый юг)</td><td><span class="status demo">Синтетические</span></td></tr>
+            <tr><td>Предприятия I категории (14)</td><td><a href="https://ecokarta.kz/company">ecokarta.kz</a> — Интерактивная карта общественного экологического мониторинга. Указан только район, поэтому значок стоит у подписи района; у ТОО «Батыс Пауэр» район не указан, на карте его нет</td><td><span class="status approx">Реальный перечень, место условно</span></td></tr>
+            <tr><td>Источники воздействия по районам</td><td>Общие сведения о регионе</td><td><span class="status approx">Нужны ссылки</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section>
+        <h3>Откуда брать реальные данные</h3>
+        <ul>
+          <li><b>Воздух (AQI, NO₂, SO₂, H₂S):</b> <a href="https://www.kazhydromet.kz">РГП «Казгидромет»</a> — ежемесячные информационные бюллетени о состоянии окружающей среды по ЗКО, данные автоматических станций Уральска и Аксая.</li>
+          <li><b>Воздух со спутника:</b> Sentinel-5P (NO₂, SO₂, CO) через <a href="https://browser.dataspace.copernicus.eu">Copernicus Browser</a> или <a href="https://earthengine.google.com">Google Earth Engine</a>. Покрывает все районы, а не только города со станциями.</li>
+          <li><b>Вода (ИЗВ):</b> бюллетени Казгидромета — индекс загрязнённости рек Урал, Шаган, Деркул, Илек по створам наблюдений.</li>
+          <li><b>Осадки (мм):</b> метеостанции Казгидромета; спутниковые и реанализные ряды — GPM IMERG (NASA) и ERA5-Land (Copernicus). Набор CHIRPS не подходит: он заканчивается на 50° с. ш., а север области лежит выше.</li>
+          <li><b>Растительность (NDVI):</b> снимки Sentinel-2 или MODIS; среднее значение считается по полигону каждого района.</li>
+          <li><b>Предприятия и жалобы населения:</b> <a href="https://ecokarta.kz">ecokarta.kz</a> — перечень предприятий-природопользователей, реестр экологических проблем и жалобы по областям. Часть графиков на сайте за 2013–2018 годы.</li>
+          <li><b>Почвы:</b> Национальный доклад о состоянии окружающей среды РК, данные земельных ресурсов и ФАО. Обычно обновляются раз в год.</li>
+        </ul>
+      </section>
+      <section>
+        <h3>План перехода на реальные данные</h3>
+        <p>NDVI, NO₂ и осадки — со спутников ежемесячно по всем 12 районам; станции Уральска и Аксая и створы рек — по бюллетеням Казгидромета. Демо-измерения удаляются из базы, а в отчёте указывается, какие значения измерены, а какие рассчитаны.</p>
+      </section>
+    </div>
+    <div class="scroll" lang="kk" data-lang="kk">
+      <section>
+        <h3>Картада қазір не бар</h3>
+        <table>
+          <thead><tr><th>Қабат</th><th>Қайдан алынған</th><th>Мәртебесі</th></tr></thead>
+          <tbody>
+            <tr><td>12 ауданның шекаралары</td><td><a href="https://github.com/wmgeolab/geoBoundaries">geoBoundaries</a>, Қазақстанның ADM2 әкімшілік бөлінісі (CC BY 4.0)</td><td><span class="status real">Нақты, жеңілдетілген</span></td></tr>
+            <tr><td>Орал қаласының контуры</td><td>Деректер жиынында қаланың жеке шекарасы жоқ, контур орталықтың айналасында шартты түрде берілген</td><td><span class="status approx">Шартты</span></td></tr>
+            <tr><td>Жайық өзені, Қарашығанақ, аудан орталықтары</td><td>Координаттар қолмен енгізілген</td><td><span class="status approx">Шамамен</span></td></tr>
+            <tr><td>Мониторинг станциялары</td><td>Көрсету үшін аудан орталықтарына орналастырылған</td><td><span class="status demo">Демонстрациялық</span></td></tr>
+            <tr><td>AQI, СЛИ, топырақтың тозуы, NDVI, жауын-шашын</td><td>Скриптпен жасалған: маусымдық заңдылықтары бар кездейсоқ мәндер (қысқы түтін, көктемгі су тасу, жазғы жауын-шашын шыңы, құрғақ оңтүстік)</td><td><span class="status demo">Синтетикалық</span></td></tr>
+            <tr><td>I санатты кәсіпорындар (14)</td><td><a href="https://ecokarta.kz/company">ecokarta.kz</a> — Қоғамдық экологиялық мониторингтің интерактивті картасы. Тек ауданы көрсетілген, сондықтан белгі аудан атауының жанында; «Батыс Пауэр» ЖШС ауданы көрсетілмеген, картада жоқ</td><td><span class="status approx">Нақты тізім, орны шартты</span></td></tr>
+            <tr><td>Аудандардағы әсер ету көздері</td><td>Өңір туралы жалпы мәліметтер</td><td><span class="status approx">Сілтеме қажет</span></td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section>
+        <h3>Нақты деректерді қайдан алуға болады</h3>
+        <ul>
+          <li><b>Ауа (AQI, NO₂, SO₂, H₂S):</b> <a href="https://www.kazhydromet.kz">«Қазгидромет» РМК</a> — БҚО бойынша қоршаған орта жай-күйі туралы ай сайынғы ақпараттық бюллетеньдер, Орал мен Ақсайдағы автоматты станциялардың деректері.</li>
+          <li><b>Ауа — спутниктен:</b> Sentinel-5P (NO₂, SO₂, CO), <a href="https://browser.dataspace.copernicus.eu">Copernicus Browser</a> немесе <a href="https://earthengine.google.com">Google Earth Engine</a> арқылы. Станциясы бар қалаларды ғана емес, барлық аудандарды қамтиды.</li>
+          <li><b>Су (СЛИ):</b> Қазгидромет бюллетеньдері — Жайық, Шаған, Деркөл, Елек өзендерінің бақылау тұстамалары бойынша ластану индексі.</li>
+          <li><b>Жауын-шашын (мм):</b> Қазгидромет метеостанциялары; спутниктік және реанализ қатарлары — GPM IMERG (NASA) және ERA5-Land (Copernicus). CHIRPS жиыны жарамайды: ол 50° с. е. аяқталады, ал облыстың солтүстігі одан жоғары орналасқан.</li>
+          <li><b>Өсімдік жамылғысы (NDVI):</b> Sentinel-2 немесе MODIS түсірілімдері; орташа мән әр ауданның полигоны бойынша есептеледі.</li>
+          <li><b>Кәсіпорындар және тұрғындар шағымдары:</b> <a href="https://ecokarta.kz">ecokarta.kz</a> — табиғат пайдаланушы кәсіпорындар тізімі, экологиялық проблемалар тізілімі және облыстар бойынша шағымдар. Сайттағы кейбір графиктер 2013–2018 жылдарға арналған.</li>
+          <li><b>Топырақ:</b> ҚР қоршаған орта жай-күйі туралы ұлттық баяндама, жер ресурстары және ФАО деректері. Әдетте жылына бір рет жаңартылады.</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Нақты деректерге көшу жоспары</h3>
+        <p>NDVI, NO₂ және жауын-шашын — спутниктерден ай сайын барлық 12 аудан бойынша; Орал мен Ақсай станциялары және өзен тұстамалары — Қазгидромет бюллетеньдері бойынша. Демо-өлшемдер дерекқордан жойылады, ал есепте қай мәндер өлшенгені, қайсысы есептелгені көрсетіледі.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
