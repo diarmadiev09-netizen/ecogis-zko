@@ -3,6 +3,8 @@
 Веб-ГИС мониторинга экологического состояния Западно-Казахстанской области.
 Авторы: Қолқанат, Дияр, Аслан.
 
+**Сайт:** https://diarmadiev09-netizen.github.io/ecogis-zko/ · **Код:** https://github.com/diarmadiev09-netizen/ecogis-zko
+
 Карта в стиле Europa Universalis IV: районы раскрашиваются по выбранному показателю (воздух, вода, почва, растительность, интегральный эко-индекс), есть хронология по месяцам, тревоги при превышении порогов и рейтинг районов. Данные хранятся в PostgreSQL + PostGIS (Supabase).
 
 ## Структура
@@ -66,9 +68,10 @@ python -m http.server 8000
 и откройте http://localhost:8000. В шапке должно быть «источник: Supabase».
 
 ### 4. Публикация в интернете
-Самый простой способ — **Netlify Drop**: зайдите на [app.netlify.com/drop](https://app.netlify.com/drop) и перетащите папку `web`. Получите адрес вида `https://ecogis-zko.netlify.app`. Затем впишите его в Supabase (шаг 2.3).
+Сайт публикуется на GitHub Pages автоматически: при каждом изменении папки `web` в ветке `main` срабатывает `.github/workflows/pages.yml`. Адрес: https://diarmadiev09-netizen.github.io/ecogis-zko/ — его же впишите в Supabase (шаг 2.3).
 
-Другой вариант — GitHub Pages: залейте репозиторий и включите Pages для папки `web`.
+Другой способ — **Netlify Drop**: зайдите на [app.netlify.com/drop](https://app.netlify.com/drop) и перетащите папку `web`. Получите адрес вида `https://ecogis-zko.netlify.app`. Затем впишите его в Supabase (шаг 2.3).
+
 
 ## Данные
 
