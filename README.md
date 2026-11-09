@@ -11,7 +11,9 @@
 
 ```
 supabase/01_schema.sql   таблицы, пространственные функции, политики доступа (RLS)
-supabase/02_seed.sql     границы 12 районов + г. Уральск, 17 станций, демо-измерения
+supabase/02_seed.sql     границы 12 районов + г. Уральск, 17 станций, предприятия, демо-измерения
+supabase/03_chat.sql     журнал ИИ-помощника (для лимитов)
+supabase/functions/ask-ecogis/index.ts   ИИ-помощник: Edge Function, Claude + инструменты к базе
 web/                     сайт: index.html, app.js, i18n.js, style.css, config.js, demo-data.json
 tools/generate_seed.py   пересобирает 02_seed.sql и demo-data.json из GeoJSON
 ```
@@ -72,6 +74,36 @@ python -m http.server 8000
 
 Другой способ — **Netlify Drop**: зайдите на [app.netlify.com/drop](https://app.netlify.com/drop) и перетащите папку `web`. Получите адрес вида `https://ecogis-zko.netlify.app`. Затем впишите его в Supabase (шаг 2.3).
 
+
+## ИИ-помощник
+
+Кнопка «ИИ-помощник» на сайте открывает чат. Вопрос уходит в Supabase Edge Function `ask-ecogis`, она спрашивает Claude (модель `claude-opus-5-5`), а Claude сам читает базу через инструменты:
+
+| Инструмент | Что делает |
+|---|---|
+| `list_districts` | районы, станции, предприятия, сколько в базе реальных и демо-измерений |
+| `get_monthly_data` | помесячные значения из `district_monthly` с фильтрами по району, показателю и периоду |
+| `find_stations_near` | пространственный запрос PostGIS `stations_within` |
+| `show_on_map` | переключает на сайте район, режим карты и месяц — карта показывает то, о чём ответ |
+
+Отвечает на языке вопроса (русский / қазақша). Ключ Claude API хранится только в секретах функции, на сайт он не попадает.
+
+**Защита от лишних расходов:** вопрос до 600 символов, не больше `CHAT_HOURLY_PER_IP` (20) вопросов в час с одного адреса и `CHAT_DAILY_LIMIT` (300) в сутки на весь сайт. Журнал — в таблице `chat_log` (IP хранится только как хеш); с сайта она не читается.
+
+### Как включить
+1. Получите ключ на [platform.claude.com](https://platform.claude.com) (раздел API keys). Запросы платные; Claude Opus 5.5 стоит $4 / $20 за миллион входных / выходных токенов, короткий вопрос обычно обходится в доли цента.
+2. В SQL Editor выполните `supabase/03_chat.sql`.
+3. Разверните функцию — через Supabase CLI:
+   ```
+   npx supabase login
+   npx supabase link --project-ref <id проекта>
+   npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   npx supabase functions deploy ask-ecogis
+   ```
+   или в панели: **Edge Functions → Deploy a new function → Via Editor**, имя `ask-ecogis`, вставьте код `supabase/functions/ask-ecogis/index.ts`; ключ — в **Edge Functions → Secrets** как `ANTHROPIC_API_KEY`.
+4. Необязательно: `CHAT_ALLOWED_ORIGIN=https://diarmadiev09-netizen.github.io` в секретах — тогда функцию сможет вызывать только ваш сайт; `CHAT_DAILY_LIMIT`, `CHAT_HOURLY_PER_IP` — свои лимиты.
+
+В демо-режиме (без `config.js`) чат открывается, но вопросы отправить нельзя — он объясняет, что нужно подключить.
 
 ## Данные
 

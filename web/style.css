@@ -168,3 +168,27 @@ html:not([lang="kk"]) [data-lang="kk"],html[lang="kk"] [data-lang="ru"]{display:
 .ents li small{display:block;color:var(--muted);font-size:11px}
 .src-note{margin:6px 0 0;font-size:11px;color:var(--muted)}
 .src-note a{color:var(--gold-hi)}
+
+/* ---------- AI assistant drawer ---------- */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.chat-btn{border-color:#7fae3e;color:#cfe8b0;background:linear-gradient(#2f3a24,#1f2618)}
+.chat-drawer{position:fixed;right:16px;bottom:16px;width:min(400px,calc(100% - 32px));height:min(600px,calc(100% - 32px));z-index:9;display:flex;flex-direction:column}
+.chat-drawer[hidden]{display:none}
+.chat-drawer header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #4a4436;background:linear-gradient(90deg,#2f3a24,#1b1e22)}
+.chat-log{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:88%;padding:8px 10px;border-radius:6px;font-size:13.5px;line-height:1.45}
+.msg p{margin:0 0 4px}.msg p:last-child{margin:0}
+.msg ul{margin:2px 0;padding-left:18px}
+.msg.bot{align-self:flex-start;background:var(--parch);color:#2a2116;border:1px solid #6e5527}
+.msg.me{align-self:flex-end;background:#33402a;border:1px solid #5d7a45}
+.msg.sys{align-self:stretch;max-width:none;background:#121417;border:1px dashed #5b5038;color:var(--muted);font-size:12.5px}
+.msg.err{border-color:#8c3a2a;color:#ffb39a}
+.msg.typing{font-style:italic;opacity:.8}
+.chat-examples{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 8px}
+.chat-examples .ex{font-size:12px;background:#1d2118;border:1px solid #5d7a45;color:#cfe8b0;border-radius:12px;padding:4px 10px;text-align:left}
+.chat-examples .ex:disabled{opacity:.45;cursor:not-allowed}
+.chat-form{display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 12px;border-top:1px solid #4a4436}
+.chat-form textarea{font:inherit;font-size:13.5px;color:var(--text);background:#111316;border:1px solid #5b5038;border-radius:3px;padding:7px 8px;resize:none}
+.chat-form button:disabled,.chat-form textarea:disabled{opacity:.5;cursor:not-allowed}
+.chat-note{margin:0;padding:0 12px 10px;font-size:11px;color:var(--muted)}
+@media (max-width:860px){.chat-drawer{right:8px;left:8px;bottom:8px;width:auto;height:min(560px,calc(100% - 16px))}}

@@ -225,9 +225,9 @@ $('dataBtn').addEventListener('click', () => { $('dataOv').classList.add('open')
 $('dataClose').addEventListener('click', () => $('dataOv').classList.remove('open'));
 for (const id of OVERLAYS) $(id).addEventListener('click', e => { if (e.target.id === id) $(id).classList.remove('open'); });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { OVERLAYS.forEach(id => $(id).classList.remove('open')); if ($('eventOv').classList.contains('open')) closeEvent(false); return; }
+  if (e.key === 'Escape') { OVERLAYS.forEach(id => $(id).classList.remove('open')); $('chatDrawer').hidden = true; if ($('eventOv').classList.contains('open')) closeEvent(false); return; }
   const tag = (e.target.tagName || '').toLowerCase();
-  if (['input', 'button', 'path', 'select'].includes(tag) || !T) return;
+  if (['input', 'textarea', 'button', 'path', 'select'].includes(tag) || !T) return;
   if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
   if (e.key === '+' || e.key === '=') { S.speed = Math.min(5, S.speed + 1); if (S.playing) startTimer(); render(); }
   if (e.key === '-') { S.speed = Math.max(1, S.speed - 1); if (S.playing) startTimer(); render(); }
@@ -435,6 +435,66 @@ function renderAdd() {
   });
 }
 
+// ---------------- AI assistant (Supabase Edge Function ask-ecogis → Claude) ----------------
+const CHAT = [];              // {role: 'user'|'assistant', content}
+let chatBusy = false, chatError = null;
+function md(s) {
+  // безопасная мини-разметка: экранирование, **жирный**, списки «- »
+  const lines = esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split('\n');
+  let html = '', inList = false;
+  for (const l of lines) {
+    const m = l.match(/^\s*[-•]\s+(.*)/);
+    if (m) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${m[1]}</li>`; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (l.trim()) html += `<p>${l}</p>`;
+  }
+  return html + (inList ? '</ul>' : '');
+}
+function renderChat() {
+  const L = tr();
+  const bubbles = [`<div class="msg bot">${md(L.chatHello)}</div>`, ...CHAT.map(m => `<div class="msg ${m.role === 'user' ? 'me' : 'bot'}">${md(m.content)}</div>`)];
+  if (!sb) bubbles.push(`<div class="msg sys">${md(L.chatDemo)}</div>`);
+  if (chatBusy) bubbles.push(`<div class="msg bot typing">${L.thinking}</div>`);
+  if (chatError) bubbles.push(`<div class="msg sys err">${esc(chatError)}</div>`);
+  $('chatLog').innerHTML = bubbles.join('');
+  $('chatLog').scrollTop = $('chatLog').scrollHeight;
+  $('chatExamples').innerHTML = CHAT.length ? '' : L.chatExamples.map(q => `<button type="button" class="ex"${sb ? '' : ' disabled'}>${esc(q)}</button>`).join('');
+  $('chatExamples').querySelectorAll('button').forEach(b => b.addEventListener('click', () => ask(b.textContent)));
+  $('chatInput').placeholder = L.chatPlaceholder;
+  $('chatInput').disabled = $('chatSend').disabled = !sb || chatBusy;
+}
+function applyMapActions(actions) {
+  const a = (actions || []).at(-1);
+  if (!a || !T) return;
+  if (a.district_id && byId[a.district_id]) S.sel = a.district_id;
+  if (a.metric && MODES[a.metric]) S.mode = a.metric;
+  if (a.month && MONTHS.includes(a.month)) S.t = MONTHS.indexOf(a.month);
+  render();
+}
+async function ask(q) {
+  q = q.trim();
+  if (!sb || chatBusy || !q) return;
+  CHAT.push({ role: 'user', content: q.slice(0, 600) });
+  chatBusy = true; chatError = null; renderChat();
+  try {
+    const { data, error } = await sb.functions.invoke('ask-ecogis', { body: { messages: CHAT, lang: LANG } });
+    let code = data?.error;
+    if (error) {
+      try { code = (await error.context.json()).error; } catch (e) { code = 'network'; }
+    }
+    if (code) { chatError = tr().chatErrors[code] || tr().chatErrors.server_error; CHAT.pop(); }
+    else { CHAT.push({ role: 'assistant', content: data.answer || '—' }); applyMapActions(data.actions); }
+  } catch (e) {
+    chatError = tr().chatErrors.network; CHAT.pop();
+  }
+  chatBusy = false; renderChat();
+  if (!chatError) $('chatInput').focus();
+}
+$('chatBtn').addEventListener('click', () => { const d = $('chatDrawer'); d.hidden = !d.hidden; if (!d.hidden) { renderChat(); $('chatInput').focus(); } });
+$('chatClose').addEventListener('click', () => { $('chatDrawer').hidden = true; });
+$('chatForm').addEventListener('submit', e => { e.preventDefault(); const v = $('chatInput').value; $('chatInput').value = ''; ask(v); });
+$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('chatForm').requestSubmit(); } });
+
 // ---------------- language switch ----------------
 function applyLang() {
   const L = tr();
@@ -451,6 +511,7 @@ function applyLang() {
   if (T) { drawMap(); render(); }
   if (curEvent) fillEvent();
   if ($('addOv').classList.contains('open')) renderAdd();
+  if (!$('chatDrawer').hidden) renderChat();
 }
 
 // ---------------- start ----------------
