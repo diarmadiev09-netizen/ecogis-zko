@@ -24,7 +24,6 @@
     <div class="chips" id="chips"></div>
     <button class="btn lang-btn" id="langBtn" type="button"></button>
     <button class="btn chat-btn" id="chatBtn" type="button" data-i18n="chat"></button>
-    <button class="btn" id="addBtn" type="button" data-i18n="add"></button>
     <button class="btn" id="ledgerBtn" type="button" data-i18n="ledger"></button>
     <button class="btn" id="dataBtn" type="button" data-i18n="sources"></button>
     <div class="datebox">
@@ -105,13 +104,6 @@
   </div>
 </div>
 
-<div class="overlay" id="addOv" role="dialog" aria-modal="true" aria-labelledby="addTitle">
-  <div class="panel form-panel">
-    <header><h2 id="addTitle" data-i18n="add"></h2><button class="btn" id="addClose" type="button" data-i18n="close"></button></header>
-    <div class="form-body" id="addBody"></div>
-  </div>
-</div>
-
 <div class="overlay" id="dataOv" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
   <div class="panel about">
     <header><h2 id="dataTitle" data-i18n="sources"></h2><button class="btn" id="dataClose" type="button" data-i18n="close"></button></header>
@@ -186,6 +178,7 @@
 
 <section class="panel chat-drawer" id="chatDrawer" aria-labelledby="chatTitle" hidden>
   <header><h2 id="chatTitle" data-i18n="chat"></h2><button class="btn" id="chatClose" type="button" data-i18n="close"></button></header>
+  <div class="chat-key" id="chatKey"></div>
   <div class="chat-log" id="chatLog" aria-live="polite"></div>
   <div class="chat-examples" id="chatExamples"></div>
   <form class="chat-form" id="chatForm">
@@ -196,9 +189,8 @@
   <p class="chat-note" data-i18n="chatNote"></p>
 </section>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
 <script src="i18n.js"></script>
 <script src="app.js"></script>
+<script type="module" src="chat.js"></script>
 </body>
 </html>

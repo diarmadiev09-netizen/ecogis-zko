@@ -192,3 +192,11 @@ html:not([lang="kk"]) [data-lang="kk"],html[lang="kk"] [data-lang="ru"]{display:
 .chat-form button:disabled,.chat-form textarea:disabled{opacity:.5;cursor:not-allowed}
 .chat-note{margin:0;padding:0 12px 10px;font-size:11px;color:var(--muted)}
 @media (max-width:860px){.chat-drawer{right:8px;left:8px;bottom:8px;width:auto;height:min(560px,calc(100% - 16px))}}
+.chat-key{padding:10px 12px 0;font-size:12.5px;color:var(--muted)}
+.chat-key p{margin:0 0 6px}
+.chat-key a{color:var(--gold-hi)}
+.chat-key .warn{color:#e0a070;font-size:11.5px}
+.key-form label{display:block;margin-bottom:4px}
+.key-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+.key-row input{font:inherit;color:var(--text);background:#111316;border:1px solid #5b5038;border-radius:3px;padding:6px 8px}
+.linkish{background:none;border:0;padding:0;color:var(--gold-hi);text-decoration:underline;font-size:12.5px}

@@ -1,4 +1,4 @@
-// ЭкоГИС ЗКО — клиент. Данные: Supabase (если заполнен config.js) или demo-data.json.
+// ЭкоГИС ЗКО — клиент. Данные: data.json; ИИ-помощник — в chat.js.
 // Тексты интерфейса — в i18n.js (русский и казахский).
 'use strict';
 
@@ -14,32 +14,10 @@ const tr = () => window.I18N[LANG];
 const loc = (obj, field) => (LANG === 'kk' && obj[field + '_kk']) || obj[field];
 
 // ---------------- data source ----------------
-const CFG = window.ECO_CONFIG || {};
-const sb = CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase
-  ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
-
-async function fetchAll(table, columns = '*') {
-  // PostgREST отдаёт не больше 1000 строк за раз — читаем страницами
-  const rows = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await sb.from(table).select(columns).range(from, from + 999);
-    if (error) throw error;
-    rows.push(...data);
-    if (data.length < 1000) return rows;
-  }
-}
+// Все данные лежат в data.json рядом со страницей (его собирает tools/generate_seed.py).
 async function loadData() {
-  if (sb) {
-    const [geo, stations, monthly, enterprises] = await Promise.all([
-      sb.rpc('districts_geojson').then(r => { if (r.error) throw r.error; return r.data; }),
-      fetchAll('stations_xy'),
-      fetchAll('district_monthly'),
-      fetchAll('enterprises', 'name,oked,category,district_id,source_url'),
-    ]);
-    return { geo, stations, monthly, enterprises };
-  }
-  const r = await fetch('demo-data.json');
-  if (!r.ok) throw new Error('demo-data.json не найден');
+  const r = await fetch('data.json');
+  if (!r.ok) throw new Error('data.json не найден');
   const j = await r.json();
   return { geo: j.districts, stations: j.stations, monthly: j.monthly, enterprises: j.enterprises || [] };
 }
@@ -216,11 +194,9 @@ $('langBtn').addEventListener('click', () => {
   try { localStorage.setItem('ecogis-lang', LANG); } catch (e) { /* storage unavailable */ }
   applyLang();
 });
-const OVERLAYS = ['ledgerOv', 'addOv', 'dataOv'];
+const OVERLAYS = ['ledgerOv', 'dataOv'];
 $('ledgerBtn').addEventListener('click', () => { $('ledgerOv').classList.add('open'); renderLedger(); $('ledgerClose').focus(); });
 $('ledgerClose').addEventListener('click', () => $('ledgerOv').classList.remove('open'));
-$('addBtn').addEventListener('click', openAdd);
-$('addClose').addEventListener('click', () => $('addOv').classList.remove('open'));
 $('dataBtn').addEventListener('click', () => { $('dataOv').classList.add('open'); $('dataClose').focus(); });
 $('dataClose').addEventListener('click', () => $('dataOv').classList.remove('open'));
 for (const id of OVERLAYS) $(id).addEventListener('click', e => { if (e.target.id === id) $(id).classList.remove('open'); });
@@ -380,121 +356,6 @@ function renderLedger() {
   $('ledBody').querySelectorAll('tr').forEach(row => row.addEventListener('click', () => { select(row.dataset.id); $('ledgerOv').classList.remove('open'); }));
 }
 
-// ---------------- add measurement (Supabase Auth + insert) ----------------
-let session = null;
-if (sb) {
-  sb.auth.getSession().then(({ data }) => { session = data.session; });
-  sb.auth.onAuthStateChange((_e, s) => { session = s; if ($('addOv').classList.contains('open')) renderAdd(); });
-}
-function openAdd() { $('addOv').classList.add('open'); renderAdd(); }
-function renderAdd() {
-  const body = $('addBody'), L = tr();
-  if (!sb) { body.innerHTML = `<p>${L.demo1}</p><p>${L.demo2}</p>`; return; }
-  if (!session) {
-    body.innerHTML = `<p>${L.loginIntro}</p>
-      <form id="loginForm" class="form-body" style="padding:0">
-        <label for="loginEmail">${L.email}<input id="loginEmail" type="email" required autocomplete="email"></label>
-        <button class="btn" type="submit">${L.getLink}</button>
-        <div class="form-msg" id="loginMsg"></div>
-      </form>`;
-    $('loginForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      const msg = $('loginMsg'); msg.className = 'form-msg'; msg.textContent = L.sending;
-      const { error } = await sb.auth.signInWithOtp({ email: $('loginEmail').value.trim(), options: { emailRedirectTo: location.href.split('#')[0], shouldCreateUser: false } });
-      if (error) { msg.className = 'form-msg err'; msg.textContent = L.linkFail(error.message); }
-      else { msg.className = 'form-msg ok'; msg.textContent = L.linkSent; }
-    });
-    return;
-  }
-  const today = new Date().toISOString().slice(0, 10);
-  const groups = D.map(d => {
-    const st = STATIONS.filter(s => s.district_id === d.id);
-    return st.length ? `<optgroup label="${esc(loc(d, 'name'))}">${st.map(s => `<option value="${s.id}">${esc(loc(s, 'name'))}</option>`).join('')}</optgroup>` : '';
-  }).join('');
-  body.innerHTML = `<p>${L.signedAs} <b>${esc(session.user.email)}</b>. <button class="btn" type="button" id="logoutBtn">${L.logout}</button></p>
-    <form id="mForm" class="form-body" style="padding:0">
-      <label for="mStation">${L.station}<select id="mStation" required>${groups}</select></label>
-      <div class="row2">
-        <label for="mMetric">${L.metric}<select id="mMetric">${METRICS.map(k => `<option value="${k}">${MT(k).label} (${MT(k).unit})</option>`).join('')}</select></label>
-        <label for="mValue">${L.value}<input id="mValue" type="number" step="any" required></label>
-      </div>
-      <label for="mDate">${L.measuredAt}<input id="mDate" type="date" required value="${today}" max="${today}"></label>
-      <button class="btn" type="submit">${L.save}</button>
-      <div class="form-msg" id="mMsg"></div>
-    </form>`;
-  $('logoutBtn').addEventListener('click', () => sb.auth.signOut());
-  $('mForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const msg = $('mMsg'); msg.className = 'form-msg'; msg.textContent = L.saving;
-    const row = { station_id: +$('mStation').value, metric: $('mMetric').value, value: +$('mValue').value, measured_at: $('mDate').value, source: 'manual' };
-    const { error } = await sb.from('measurements').insert(row);
-    if (error) { msg.className = 'form-msg err'; msg.textContent = `${L.error}: ${error.message}`; return; }
-    msg.className = 'form-msg ok'; msg.textContent = L.savedRefresh;
-    await refresh(row.measured_at.slice(0, 7));
-    msg.textContent = L.saved;
-  });
-}
-
-// ---------------- AI assistant (Supabase Edge Function ask-ecogis → Claude) ----------------
-const CHAT = [];              // {role: 'user'|'assistant', content}
-let chatBusy = false, chatError = null;
-function md(s) {
-  // безопасная мини-разметка: экранирование, **жирный**, списки «- »
-  const lines = esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split('\n');
-  let html = '', inList = false;
-  for (const l of lines) {
-    const m = l.match(/^\s*[-•]\s+(.*)/);
-    if (m) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${m[1]}</li>`; continue; }
-    if (inList) { html += '</ul>'; inList = false; }
-    if (l.trim()) html += `<p>${l}</p>`;
-  }
-  return html + (inList ? '</ul>' : '');
-}
-function renderChat() {
-  const L = tr();
-  const bubbles = [`<div class="msg bot">${md(L.chatHello)}</div>`, ...CHAT.map(m => `<div class="msg ${m.role === 'user' ? 'me' : 'bot'}">${md(m.content)}</div>`)];
-  if (!sb) bubbles.push(`<div class="msg sys">${md(L.chatDemo)}</div>`);
-  if (chatBusy) bubbles.push(`<div class="msg bot typing">${L.thinking}</div>`);
-  if (chatError) bubbles.push(`<div class="msg sys err">${esc(chatError)}</div>`);
-  $('chatLog').innerHTML = bubbles.join('');
-  $('chatLog').scrollTop = $('chatLog').scrollHeight;
-  $('chatExamples').innerHTML = CHAT.length ? '' : L.chatExamples.map(q => `<button type="button" class="ex"${sb ? '' : ' disabled'}>${esc(q)}</button>`).join('');
-  $('chatExamples').querySelectorAll('button').forEach(b => b.addEventListener('click', () => ask(b.textContent)));
-  $('chatInput').placeholder = L.chatPlaceholder;
-  $('chatInput').disabled = $('chatSend').disabled = !sb || chatBusy;
-}
-function applyMapActions(actions) {
-  const a = (actions || []).at(-1);
-  if (!a || !T) return;
-  if (a.district_id && byId[a.district_id]) S.sel = a.district_id;
-  if (a.metric && MODES[a.metric]) S.mode = a.metric;
-  if (a.month && MONTHS.includes(a.month)) S.t = MONTHS.indexOf(a.month);
-  render();
-}
-async function ask(q) {
-  q = q.trim();
-  if (!sb || chatBusy || !q) return;
-  CHAT.push({ role: 'user', content: q.slice(0, 600) });
-  chatBusy = true; chatError = null; renderChat();
-  try {
-    const { data, error } = await sb.functions.invoke('ask-ecogis', { body: { messages: CHAT, lang: LANG } });
-    let code = data?.error;
-    if (error) {
-      try { code = (await error.context.json()).error; } catch (e) { code = 'network'; }
-    }
-    if (code) { chatError = tr().chatErrors[code] || tr().chatErrors.server_error; CHAT.pop(); }
-    else { CHAT.push({ role: 'assistant', content: data.answer || '—' }); applyMapActions(data.actions); }
-  } catch (e) {
-    chatError = tr().chatErrors.network; CHAT.pop();
-  }
-  chatBusy = false; renderChat();
-  if (!chatError) $('chatInput').focus();
-}
-$('chatBtn').addEventListener('click', () => { const d = $('chatDrawer'); d.hidden = !d.hidden; if (!d.hidden) { renderChat(); $('chatInput').focus(); } });
-$('chatClose').addEventListener('click', () => { $('chatDrawer').hidden = true; });
-$('chatForm').addEventListener('submit', e => { e.preventDefault(); const v = $('chatInput').value; $('chatInput').value = ''; ask(v); });
-$('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('chatForm').requestSubmit(); } });
-
 // ---------------- language switch ----------------
 function applyLang() {
   const L = tr();
@@ -506,12 +367,11 @@ function applyLang() {
   $('modesPanel').setAttribute('aria-label', L.modesAria);
   $('alertsPanel').setAttribute('aria-label', L.alertsTitle);
   $('speeds').setAttribute('aria-label', L.speed);
-  $('srcChip').textContent = sb ? L.srcLive : L.srcDemo;
-  $('note').textContent = sb ? L.noteLive : L.noteDemo;
+  $('srcChip').textContent = L.srcFile;
+  $('note').textContent = L.noteDemo;
   if (T) { drawMap(); render(); }
   if (curEvent) fillEvent();
-  if ($('addOv').classList.contains('open')) renderAdd();
-  if (!$('chatDrawer').hidden) renderChat();
+  document.dispatchEvent(new Event('ecogis:lang')); // чат (chat.js) перерисуется на новом языке
 }
 
 // ---------------- start ----------------
@@ -523,13 +383,12 @@ async function refresh(focusMonth) {
   drawMap(); render();
 }
 (async () => {
-  $('srcChip').classList.toggle('live', !!sb);
   applyLang();
   try {
     await refresh();
     $('loading').remove();
   } catch (err) {
     console.error(err);
-    $('loading').innerHTML = `${tr().loadFail}<small>${esc(err.message || err)}. ${sb ? tr().loadHintLive : tr().loadHintDemo}</small>`;
+    $('loading').innerHTML = `${tr().loadFail}<small>${esc(err.message || err)}. ${tr().loadHintDemo}</small>`;
   }
 })();

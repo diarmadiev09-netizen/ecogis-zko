@@ -1,11 +1,11 @@
-"""Builds supabase/02_seed.sql and web/demo-data.json.
+"""Builds web/data.json — all data the site shows.
 
 Input: a geoBoundaries ADM2 GeoJSON for Kazakhstan (CC BY 4.0), e.g.
 https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/gbOpen/KAZ/ADM2/geoBoundaries-KAZ-ADM2_simplified.geojson
 
 Usage:  python tools/generate_seed.py path/to/geoBoundaries-KAZ-ADM2_simplified.geojson
-The demo measurements are synthetic (source = 'demo') and can be removed with
-    delete from measurements where source = 'demo';
+The measurements are synthetic demo values; replace them with real ones in data.json
+(or change the generator) when you have them.
 """
 import json
 import math
@@ -144,14 +144,6 @@ def ndvi_s(m):
     return .35 + .65 * math.exp(-((m - 6) ** 2) / 5)
 
 
-def sql_str(s):
-    return "'" + s.replace("'", "''") + "'"
-
-
-def sql_arr(xs):
-    return f"array[{', '.join(sql_str(x) for x in xs)}]::text[]"
-
-
 def feature(did, ru, kk, geom, is_city):
     return dict(id=did, name=ru[0], short=ru[1], center=ru[2], sources=ru[3],
                 name_kk=kk[0], short_kk=kk[1], center_kk=kk[2], sources_kk=kk[3], is_city=is_city, geom=geom)
@@ -195,35 +187,7 @@ def main(src):
                 (s['id'], 'precip', round(prec0 * PRECIP_SHARE[m - 1] * (.4 + 1.2 * rng.random()), 1), date),
             ]
 
-    # ---- 02_seed.sql
-    out = ['-- ЭкоГИС ЗКО — начальные данные. Запускать после 01_schema.sql.',
-           '-- Границы районов: geoBoundaries (CC BY 4.0). Контур г. Уральска условный (круг 9 км).',
-           "-- Измерения синтетические (source = 'demo'); удалить: delete from measurements where source = 'demo';",
-           'begin;', 'truncate public.measurements, public.enterprises, public.stations, public.districts restart identity cascade;', '']
-    for f in features:
-        out.append('insert into public.districts (id, name_ru, short_ru, center, sources, name_kk, short_kk, center_kk, sources_kk, is_city, geom) values ('
-                   f"{sql_str(f['id'])}, {sql_str(f['name'])}, {sql_str(f['short'])}, {sql_str(f['center'])}, {sql_arr(f['sources'])}, "
-                   f"{sql_str(f['name_kk'])}, {sql_str(f['short_kk'])}, {sql_str(f['center_kk'])}, {sql_arr(f['sources_kk'])}, "
-                   f"{str(f['is_city']).lower()}, "
-                   f"extensions.st_setsrid(extensions.st_geomfromgeojson({sql_str(json.dumps(f['geom'], separators=(',', ':')))}), 4326));")
-    out.append('')
-    for s in stations:
-        out.append(f"insert into public.stations (id, name, name_kk, kind, geom) values ({s['id']}, {sql_str(s['name'])}, {sql_str(s['name_kk'])}, 'multi', "
-                   f"extensions.st_setsrid(extensions.st_makepoint({s['lon']}, {s['lat']}), 4326));")
-    out.append("select setval('public.stations_id_seq', (select max(id) from public.stations));")
-    out.append('')
-    for name, oked, did in ENTERPRISES:
-        out.append(f"insert into public.enterprises (name, oked, category, district_id, source_url) values ({sql_str(name)}, {sql_str(oked)}, 1, "
-                   f"{sql_str(did) if did else 'null'}, {sql_str(ECOKARTA_URL)});")
-    out.append('')
-    for i in range(0, len(measurements), 200):
-        chunk = measurements[i:i + 200]
-        out.append('insert into public.measurements (station_id, metric, value, measured_at, source, created_by) values\n' +
-                   ',\n'.join(f"({sid}, '{k}', {v}, '{d}', 'demo', null)" for sid, k, v, d in chunk) + ';')
-    out.append('commit;')
-    (ROOT / 'supabase' / '02_seed.sql').write_text('\n'.join(out) + '\n', encoding='utf8')
-
-    # ---- web/demo-data.json: same shapes the Supabase API returns
+    # ---- web/data.json: everything the site shows
     groups = {}
     for sid, k, v, d in measurements:
         key = (stations[sid - 1]['district_id'], d[:8] + '01', k)
@@ -238,7 +202,7 @@ def main(src):
         'monthly': monthly,
         'enterprises': [dict(name=n, oked=o, category=1, district_id=d, source_url=ECOKARTA_URL) for n, o, d in ENTERPRISES],
     }
-    (ROOT / 'web' / 'demo-data.json').write_text(json.dumps(demo, ensure_ascii=False, separators=(',', ':')), encoding='utf8')
+    (ROOT / 'web' / 'data.json').write_text(json.dumps(demo, ensure_ascii=False, separators=(',', ':')), encoding='utf8')
     print(f'{len(features)} districts, {len(stations)} stations, {len(measurements)} measurements')
 
 
